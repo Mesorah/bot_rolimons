@@ -1,0 +1,15 @@
+[
+    {
+        "file_path_to_chrome": "user-data-dir=C:/Users/User/AppData/Local/Google/Chrome/User Data",
+        "verification_time": 0.01,
+        "deal": "20",
+        "automatic_mode": false
+    },
+    {
+        "allowed_itens": {
+            "Example for test": {
+                "min_robux": 99999999
+            }
+        }
+    }
+]
