@@ -9,7 +9,7 @@ import time
 
 class Configuration:
     def __init__(self):
-        with open('infs.json', 'r') as json_file:
+        with open('bot_rolimons/bot_rolimons/infs.json', 'r') as json_file:
             self.data = json.load(json_file)
 
         (self.file_path_to_chrome, self.verification_time,
@@ -161,7 +161,7 @@ try:
 
         else:
             if first_item_title:
-                if first_item_title == title:
+                if first_item_title != title:
                     first_item_element.click()
 
                     original_window = bot_rolimons.driver.current_window_handle
