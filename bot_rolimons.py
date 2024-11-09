@@ -9,11 +9,12 @@ import time
 
 class Configuration:
     def __init__(self):
-        with open('bot_rolimons/bot_rolimons/infs.json', 'r') as json_file:
+        with open('infs.json', 'r') as json_file:
             self.data = json.load(json_file)
 
         (self.file_path_to_chrome, self.verification_time,
-         self.deal, self.automatic_mode) = self.data[0].values()
+         self.deal, self.wait_to_close,
+         self.automatic_mode) = self.data[0].values()
 
         self.allowed_itens = self.data[1]['allowed_itens']
 
@@ -42,7 +43,7 @@ class BaseBot:
             time.sleep(sleep)
 
 
-class BotRolimons(BaseBot):
+class RolimonsDealBot(BaseBot):
     def __init__(self, deal, chrome_options):
         self.driver = webdriver.Chrome(options=chrome_options)
         super().__init__(self.driver)
@@ -71,8 +72,13 @@ class BotRolimons(BaseBot):
                 By.CSS_SELECTOR,
                 ".stat-data.text-light.text-truncate").text.replace(",", ""))
 
+            try:
+                self.first_item_price = int(self.first_item_price)
+            except ValueError:
+                self.first_item_price = 99999999999
+
             return (self.first_item_title, self.first_item,
-                    self.number_of_items, int(self.first_item_price))
+                    self.number_of_items, self.first_item_price)
 
         return None, None, self.number_of_items, None
 
@@ -87,18 +93,6 @@ class BotBuyItem(BaseBot):
         self.first_item_title = first_item_title
         self.first_item_price = first_item_price
 
-    def click_element_with_delay(self,
-                                 driver_time, by, item_name, sleep=False):
-
-        self.dropdown = WebDriverWait(self.driver, driver_time).until(
-            EC.element_to_be_clickable((by, item_name)))
-        self.dropdown.click()
-
-        if sleep:
-            return time.sleep(sleep)
-
-        return
-
     def verify_if_windows_is_changed(self, original_window):
         for window_handle in self.driver.window_handles:
             if window_handle != original_window:
@@ -106,10 +100,22 @@ class BotBuyItem(BaseBot):
                 return
 
     def buy_button(self):
-        self.click_element_with_delay(
-            10, By.XPATH, "//button[contains(text(), 'Comprar')]", False)
+        self.click_element_with_delay(10,
+                                      By.XPATH,
+                                      "//button[contains(text(), 'Comprar')]",
+                                      False)
 
         return True
+
+    def close_window(self, first_item_title, first_item_price):
+        window_handles = self.driver.window_handles
+
+        self.driver.switch_to.window(window_handles[1])
+        self.driver.close()
+        self.driver.switch_to.window(window_handles[0])
+
+        self.first_item_title = first_item_title
+        self.first_item_price = first_item_price
 
     def buy_item(self):
         self.click_element_with_delay(
@@ -129,32 +135,41 @@ class BotBuyItem(BaseBot):
                         print(f"Erro ao clicar no buy button: {e}")
 
 
+class PageReturns:
+    def __init__(self, driver):
+        self.driver = driver
+        self.driver.switch_to.window('"https://www.rolimons.com/deals"')
+
+
 configuration = Configuration()
 
 chrome_options = ConfigureChromeOptions(
     configuration.file_path_to_chrome).chrome_options
 
-bot_rolimons = BotRolimons(configuration.deal, chrome_options)
+rolimons_deal_bot = RolimonsDealBot(configuration.deal, chrome_options)
 
 
-first_item_title, _, _, first_item_price = bot_rolimons.get_first_item()
+first_item_title, _, _, first_item_price = rolimons_deal_bot.get_first_item()
 
-bot_buy_item = BotBuyItem(bot_rolimons.driver,
+bot_buy_item = BotBuyItem(rolimons_deal_bot.driver,
                           configuration.allowed_itens,
                           first_item_title,
                           first_item_price)
 
+
 try:
-    bot_rolimons.click_to_deals_bellow()
-    bot_rolimons.click_on_specific_deals()
+    rolimons_deal_bot.click_to_deals_bellow()
+    rolimons_deal_bot.click_on_specific_deals()
 
     (title, item, initial_number_of_items,
-     first_item_price) = bot_rolimons.get_first_item()
+     first_item_price) = rolimons_deal_bot.get_first_item()
 
     while True:
         time.sleep(configuration.verification_time)
+
         (first_item_title, first_item_element,
-         number_of_items, first_item_price) = bot_rolimons.get_first_item()
+         number_of_items,
+         first_item_price) = rolimons_deal_bot.get_first_item()
 
         if initial_number_of_items < number_of_items:
             initial_number_of_items = number_of_items
@@ -162,9 +177,11 @@ try:
         else:
             if first_item_title:
                 if first_item_title != title:
+                    print('Robux lançado inicialmente', first_item_price)
                     first_item_element.click()
 
-                    original_window = bot_rolimons.driver.current_window_handle
+                    original_window = (rolimons_deal_bot
+                                       .driver.current_window_handle)
 
                     bot_buy_item.verify_if_windows_is_changed(original_window)
 
@@ -175,13 +192,21 @@ try:
                             bot_buy_item.if_automatic_mode_is_true(
                                 first_item_title, first_item_price)
 
+                        time.sleep(configuration.wait_to_close)
+
+                        bot_buy_item.close_window(first_item_title,
+                                                  first_item_price)
+
+                        (title, item, initial_number_of_items,
+                         first_item_price) = rolimons_deal_bot.get_first_item()
+
                     except Exception as e:
                         print(f"Erro ao clicar no buy button: {e}")
 
-                print(f"O primeiro item é: {first_item_title}")
+                # print(f"O primeiro item é: {first_item_title}")
 
 except Exception as e:
     print("Ocorreu um erro no bloco principal:", e)
 
 finally:
-    bot_rolimons.driver.quit()
+    rolimons_deal_bot.driver.quit()

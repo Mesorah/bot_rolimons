@@ -3,6 +3,7 @@
         "file_path_to_chrome": "user-data-dir=C:/Users/User/AppData/Local/Google/Chrome/User Data",
         "verification_time": 0.01,
         "deal": "20",
+        "wait_to_close": 5,
         "automatic_mode": false
     },
     {
