@@ -1,8 +1,11 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+import threading
+import winsound
 import json
 import time
 
@@ -36,9 +39,12 @@ class BaseBot:
 
     def click_element_with_delay(self, driver_time,
                                  by, item_name, sleep=False):
+
         dropdown = WebDriverWait(self.driver, driver_time).until(
             EC.element_to_be_clickable((by, item_name)))
+
         dropdown.click()
+
         if sleep:
             time.sleep(sleep)
 
@@ -105,7 +111,17 @@ class BotBuyItem(BaseBot):
                                       "//button[contains(text(), 'Comprar')]",
                                       False)
 
-        return True
+        # text_robux = (self.driver.find_element(
+        #        By.CSS_SELECTOR,
+        #        ".text-robux"))
+
+        # text_robux = text_robux.text.replace(",", "").replace(".", "")
+
+        # last_item_price = int(text_robux)
+
+        # print(last_item_price)
+
+        # return last_item_price
 
     def close_window(self, first_item_title, first_item_price):
         window_handles = self.driver.window_handles
@@ -123,22 +139,25 @@ class BotBuyItem(BaseBot):
 
         return True
 
-    def if_automatic_mode_is_true(self):
+    def if_automatic_mode_is_true(self, first_item_title, first_item_price):
         for item_name, item_data in self.allowed_itens.items():
             self.min_robux = item_data.get('min_robux')
-            if item_name != self.first_item_title:
-                if self.first_item_price <= self.min_robux:
+            if item_name != first_item_title:
+                if first_item_price <= self.min_robux:
                     try:
                         self.buy_item()
 
                     except Exception as e:
                         print(f"Erro ao clicar no buy button: {e}")
 
+    @staticmethod
+    def play_sound():
+        winsound.Beep(1000, 500)
 
-class PageReturns:
-    def __init__(self, driver):
-        self.driver = driver
-        self.driver.switch_to.window('"https://www.rolimons.com/deals"')
+    @staticmethod
+    def play_sound_thread():
+        thread = threading.Thread(target=BotBuyItem.play_sound)
+        thread.start()
 
 
 configuration = Configuration()
@@ -167,9 +186,19 @@ try:
     while True:
         time.sleep(configuration.verification_time)
 
-        (first_item_title, first_item_element,
-         number_of_items,
-         first_item_price) = rolimons_deal_bot.get_first_item()
+        try:
+            (first_item_title,
+             first_item_element,
+             number_of_items,
+             first_item_price) = rolimons_deal_bot.get_first_item()
+        except StaleElementReferenceException:
+            (first_item_title,
+             first_item_element,
+             number_of_items,
+             first_item_price) = rolimons_deal_bot.get_first_item()
+        except Exception as e:
+            print(f"Ocorreu um erro inesperado: {e}")
+            continue
 
         if initial_number_of_items < number_of_items:
             initial_number_of_items = number_of_items
@@ -178,12 +207,18 @@ try:
             if first_item_title:
                 if first_item_title != title:
                     print('Robux lançado inicialmente', first_item_price)
-                    first_item_element.click()
+
+                    try:
+                        first_item_element.click()
+                    except Exception as e:
+                        print('erro no click', e)
 
                     original_window = (rolimons_deal_bot
                                        .driver.current_window_handle)
 
                     bot_buy_item.verify_if_windows_is_changed(original_window)
+
+                    bot_buy_item.play_sound_thread()
 
                     try:
                         bot_buy_item.buy_button()
@@ -194,11 +229,15 @@ try:
 
                         time.sleep(configuration.wait_to_close)
 
-                        bot_buy_item.close_window(first_item_title,
-                                                  first_item_price)
+                        try:
+                            bot_buy_item.close_window(first_item_title,
+                                                      first_item_price)
+                        except Exception as e:
+                            print('erro ao fechar a janela', e)
 
                         (title, item, initial_number_of_items,
-                         first_item_price) = rolimons_deal_bot.get_first_item()
+                            first_item_price) = (rolimons_deal_bot.
+                                                 get_first_item())
 
                     except Exception as e:
                         print(f"Erro ao clicar no buy button: {e}")
